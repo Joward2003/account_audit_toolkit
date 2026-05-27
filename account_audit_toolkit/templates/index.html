@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号审阅自动化</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            padding: 32px 0;
+            margin-bottom: 24px;
+        }
+        .header h1 { font-size: 24px; font-weight: 600; }
+        .header p { opacity: 0.7; margin-top: 4px; font-size: 14px; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .upload-zone-sm { padding: 20px; }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #0f3460;
+            background: #f8fafc;
+        }
+        .upload-zone p { color: #6b7280; margin-top: 8px; font-size: 13px; }
+        .upload-zone .icon { font-size: 40px; }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 16px;
+        }
+        .form-row label { font-size: 14px; color: #374151; white-space: nowrap; }
+        .form-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #0f3460;
+            color: white;
+        }
+        .btn-primary:hover { background: #16213e; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline {
+            background: white;
+            color: #0f3460;
+            border: 1px solid #0f3460;
+        }
+        .btn-outline:hover { background: #f0f2f5; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+        /* Status */
+        .status { margin-top: 16px; }
+        .status-running {
+            color: #2563eb;
+            background: #eff6ff;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+        .status-error {
+            color: #dc2626;
+            background: #fef2f2;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        /* Table */
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover td { background: #f9fafb; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-pass { background: #dcfce7; color: #166534; }
+        .badge-na { background: #f3f4f6; color: #6b7280; }
+        .badge-fail { background: #fef2f2; color: #dc2626; }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+
+        /* Summary */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .summary-card {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .summary-card .num { font-size: 28px; font-weight: 700; }
+        .summary-card .label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .summary-card.pass .num { color: #16a34a; }
+        .summary-card.fail .num { color: #dc2626; }
+
+        .hidden { display: none; }
+
+        .actions { display: flex; gap: 8px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="container">
+        <h1>🔍 账号审阅自动化</h1>
+        <p>上传文件 → 一键运行审阅流水线 → 查看 & 下载结论</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Upload Card -->
+    <div class="card" id="uploadCard">
+        <div class="card-title">📤 上传文件</div>
+
+        <!-- 审阅文件 -->
+        <div class="upload-section">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">审阅文件（Excel）</p>
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">📁</div>
+                <p><strong>请上传文件</strong></p>
+                <p style="font-size:12px;color:#9ca3af;">支持 .xlsx / .xls / .csv</p>
+            </div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden"
+                   onchange="onFileSelected(event, 'file')">
+            <div id="fileInfo" class="hidden" style="margin-top:8px;font-size:13px;color:#374151;"></div>
+        </div>
+
+        <!-- Supporting 文件夹 -->
+        <div class="upload-section" style="margin-top:16px;">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">Supporting 文件夹（zip，可选）</p>
+            <div class="upload-zone upload-zone-sm" id="supDropZone" onclick="document.getElementById('supInput').click()">
+                <p><strong>请上传 supporting.zip</strong></p>
+                <p style="font-size:12px;color:#9ca3af;">将 OPM / YumcZoo 文件夹打包为 zip</p>
+            </div>
+            <input type="file" id="supInput" accept=".zip" class="hidden"
+                   onchange="onFileSelected(event, 'sup')">
+            <div id="supInfo" class="hidden" style="margin-top:8px;font-size:13px;color:#374151;"></div>
+        </div>
+
+        <div class="form-row">
+            <label>Sheet 名:</label>
+            <input type="text" id="sheetName" value="Sheet1" placeholder="Sheet1">
+            <button class="btn btn-primary" id="runBtn" disabled onclick="runPipeline()">
+                ▶ 运行流水线
+            </button>
+        </div>
+
+        <div id="statusArea"></div>
+    </div>
+
+    <!-- Results Card -->
+    <div class="card hidden" id="resultCard">
+        <div class="card-title">📊 审阅结论</div>
+
+        <div class="summary-grid" id="summaryGrid"></div>
+
+        <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+            <table id="resultTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-outline" onclick="downloadConclusion()">📥 下载 Excel</button>
+            <button class="btn btn-outline btn-sm" onclick="resetPage()">🔄 重新上传</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let selectedFile = null;
+let selectedSupFile = null;
+
+// Drag & Drop for main file
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) handleFile(files[0], 'file');
+});
+
+function onFileSelected(e, type) {
+    if (e.target.files.length > 0) handleFile(e.target.files[0], type);
+}
+
+function handleFile(file, type) {
+    if (type === 'file') {
+        selectedFile = file;
+        document.getElementById('fileInfo').classList.remove('hidden');
+        document.getElementById('fileInfo').innerHTML =
+            `✅ 审阅文件: <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`;
+    } else {
+        selectedSupFile = file;
+        document.getElementById('supInfo').classList.remove('hidden');
+        document.getElementById('supInfo').innerHTML =
+            `✅ Supporting: <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`;
+    }
+    updateRunBtn();
+}
+
+function updateRunBtn() {
+    document.getElementById('runBtn').disabled = !selectedFile;
+}
+
+function runPipeline() {
+    if (!selectedFile) return;
+
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 运行中...';
+
+    const statusArea = document.getElementById('statusArea');
+    statusArea.innerHTML = '<div class="status-running">⏳ 正在运行审阅流水线，请稍候（可能需要几十秒）...</div>';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('sheet', document.getElementById('sheetName').value || 'Sheet1');
+    if (selectedSupFile) {
+        formData.append('supporting', selectedSupFile);
+    }
+
+    fetch('/api/run', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            statusArea.innerHTML = '';
+            btn.disabled = false;
+            btn.textContent = '▶ 运行流水线';
+
+            if (data.error) {
+                statusArea.innerHTML = `<div class="status-error">❌ ${data.error}</div>`;
+                return;
+            }
+
+            showResults(data);
+        })
+        .catch(err => {
+            statusArea.innerHTML = `<div class="status-error">❌ 请求失败: ${err.message}</div>`;
+            btn.disabled = false;
+            btn.textContent = '▶ 运行流水线';
+        });
+}
+
+function showResults(data) {
+    document.getElementById('resultCard').classList.remove('hidden');
+
+    // Summary
+    const rows = data.rows || [];
+    const nodes = rows.length > 0
+        ? Object.keys(rows[0]).filter(k => !['Category','System','System Owner','是否使用DBA PaaS服务','服务器类型','PMS流程','发版工具','Remark','通过/需检查'].includes(k))
+        : [];
+
+    let totalPass = 0, totalFail = 0, totalNA = 0, totalPending = 0;
+    rows.forEach(row => {
+        nodes.forEach(n => {
+            const v = String(row[n] || '');
+            if (v.startsWith('是')) totalPass++;
+            else if (v.startsWith('否')) totalFail++;
+            else if (v.startsWith('N/A')) totalNA++;
+            else totalPending++;
+        });
+    });
+
+    document.getElementById('summaryGrid').innerHTML = `
+        <div class="summary-card pass"><div class="num">${totalPass}</div><div class="label">✅ 通过</div></div>
+        <div class="summary-card fail"><div class="num">${totalFail}</div><div class="label">❌ 未通过</div></div>
+        <div class="summary-card"><div class="num" style="color:#6b7280;">${totalNA}</div><div class="label">N/A</div></div>
+        <div class="summary-card"><div class="num" style="color:#854d0e;">${totalPending}</div><div class="label">待确认</div></div>
+    `;
+
+    // Table
+    const allCols = ['System', 'Category', ...nodes, '通过/需检查'];
+    const thead = document.querySelector('#resultTable thead');
+    const tbody = document.querySelector('#resultTable tbody');
+
+    thead.innerHTML = '<tr>' + allCols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+
+    tbody.innerHTML = rows.map(row => {
+        const cells = allCols.map(col => {
+            const v = String(row[col] || '');
+            let badge = '';
+            if (v.startsWith('是')) badge = 'badge-pass';
+            else if (v.startsWith('否')) badge = 'badge-fail';
+            else if (v.startsWith('N/A')) badge = 'badge-na';
+            else if (v === '待确认') badge = 'badge-pending';
+            return `<td>${badge ? `<span class="badge ${badge}">${v}</span>` : v}</td>`;
+        });
+        return `<tr>${cells.join('')}</tr>`;
+    }).join('');
+}
+
+function downloadConclusion() {
+    window.open('/api/download', '_blank');
+}
+
+function resetPage() {
+    selectedFile = null;
+    selectedSupFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('supInput').value = '';
+    document.getElementById('fileInfo').classList.add('hidden');
+    document.getElementById('supInfo').classList.add('hidden');
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('statusArea').innerHTML = '';
+    document.getElementById('resultCard').classList.add('hidden');
+}
+</script>
+</body>
+</html>
