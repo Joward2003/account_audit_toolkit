@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# 程序输出与上传目录（本地数据，不入库）
+output/
+uploads/
+*.xlsx
+!configs/*.xlsx
+
+# 旧英文配置备份（历史存档，不入库）
+旧英文配置备份/
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号审阅自动化</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            padding: 32px 0;
+            margin-bottom: 24px;
+        }
+        .header h1 { font-size: 24px; font-weight: 600; }
+        .header p { opacity: 0.7; margin-top: 4px; font-size: 14px; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .upload-zone-sm { padding: 20px; }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #0f3460;
+            background: #f8fafc;
+        }
+        .upload-zone p { color: #6b7280; margin-top: 8px; font-size: 13px; }
+        .upload-zone .icon { font-size: 40px; }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 16px;
+        }
+        .form-row label { font-size: 14px; color: #374151; white-space: nowrap; }
+        .form-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #0f3460;
+            color: white;
+        }
+        .btn-primary:hover { background: #16213e; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline {
+            background: white;
+            color: #0f3460;
+            border: 1px solid #0f3460;
+        }
+        .btn-outline:hover { background: #f0f2f5; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+        /* Status */
+        .status { margin-top: 16px; }
+        .status-running {
+            color: #2563eb;
+            background: #eff6ff;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+        .status-error {
+            color: #dc2626;
+            background: #fef2f2;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+        .status-current {
+            font-weight: 600;
+        }
+        .progress-log {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #bfdbfe;
+            max-height: 130px;
+            overflow-y: auto;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        /* Table */
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover td { background: #f9fafb; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-pass { background: #dcfce7; color: #166534; }
+        .badge-na { background: #f3f4f6; color: #6b7280; }
+        .badge-fail { background: #fef2f2; color: #dc2626; }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+
+        /* Summary */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .summary-card {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .summary-card .num { font-size: 28px; font-weight: 700; }
+        .summary-card .label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .summary-card.pass .num { color: #16a34a; }
+        .summary-card.fail .num { color: #dc2626; }
+        .summary-card.pending .num { color: #854d0e; }
+
+        .hidden { display: none; }
+
+        .actions { display: flex; gap: 8px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="container">
+        <h1>🔍 账号审阅自动化</h1>
+        <p>上传文件 → 一键检查 → 查看并下载结论</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Upload Card -->
+    <div class="card" id="uploadCard">
+        <div class="card-title">📤 上传文件</div>
+
+        <!-- 审阅文件 -->
+        <div class="upload-section">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">审阅文件（Excel）</p>
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">📁</div>
+                <p><strong>请上传审阅文件</strong></p>
+                <p style="font-size:12px;color:#9ca3af;">Excel 或 CSV 格式</p>
+            </div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden"
+                   onchange="onFileSelected(event, 'file')">
+            <div id="fileInfo" class="hidden" style="margin-top:8px;font-size:13px;color:#374151;"></div>
+        </div>
+
+        <!-- Supporting 文件夹 -->
+        <div class="upload-section" style="margin-top:16px;">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">支持性文件夹（zip，可选）</p>
+            <div class="upload-zone upload-zone-sm" id="supDropZone" onclick="document.getElementById('supInput').click()">
+                <p><strong>请上传支持性文件</strong></p>
+                <p style="font-size:12px;color:#9ca3af;">请把支持性文件打包为 zip</p>
+            </div>
+            <input type="file" id="supInput" accept=".zip" class="hidden"
+                   onchange="onFileSelected(event, 'sup')">
+            <div id="supInfo" class="hidden" style="margin-top:8px;font-size:13px;color:#374151;"></div>
+        </div>
+
+        <div class="form-row">
+            <label>工作表名:</label>
+            <input type="text" id="sheetName" value="Sheet1" placeholder="Sheet1">
+            <button class="btn btn-primary" id="runBtn" disabled onclick="runPipeline()">
+                ▶ 开始检查
+            </button>
+        </div>
+
+        <div id="statusArea"></div>
+    </div>
+
+    <!-- Results Card -->
+    <div class="card hidden" id="resultCard">
+        <div class="card-title">📊 审阅结论</div>
+
+        <div class="summary-grid" id="summaryGrid"></div>
+
+        <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+            <table id="resultTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-outline" onclick="downloadConclusion()">📥 下载 Excel</button>
+            <button class="btn btn-outline btn-sm" onclick="resetPage()">🔄 重新上传</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let selectedFile = null;
+let selectedSupFile = null;
+
+function friendlyText(value) {
+    let text = String(value ?? '');
+    if (!text) return '';
+
+    if (text.startsWith('N/A-Refer to ')) {
+        return `不适用（引用 ${text.replace('N/A-Refer to ', '').trim()} 材料）`;
+    }
+    if (text.startsWith('Refer to ')) {
+        return `引用 ${text.replace('Refer to ', '').trim()} 材料`;
+    }
+    if (text === 'N/A') return '不适用';
+    if (text.startsWith('N/A-')) return `不适用（${text.replace('N/A-', '').trim()}）`;
+
+    const replacements = [
+        ['流水线', '检查流程'],
+        ['supporting', '支持性文件'],
+        ['Supporting', '支持性文件'],
+        ['Sheet', '工作表'],
+        ['sheet', '工作表'],
+        ['SOD', '前后台管理员重合检查'],
+        ['派生检查', '规则检查'],
+        ['ZIP', '压缩包'],
+        ['zip', '压缩包'],
+        ['OCR触发/未触发原因', '截图核对原因'],
+        ['OCR已匹配账号', '按表格位置已确认账号'],
+        ['ocr_global_matched_accounts', '全文补充确认账号'],
+        ['global_matched_accounts', '全文补充确认账号'],
+        ['OCR缺失账号', '截图中未确认账号'],
+        ['OCR明细', '截图核对明细'],
+        ['OCR状态', '截图核对状态'],
+        ['是否执行OCR', '是否核对截图'],
+        ['OCR', '截图文字识别'],
+        ['ocr', '截图文字识别'],
+        ['ExpectedSetStatus', '账号清单状态'],
+        ['ExpectedSetNote', '账号清单说明'],
+        ['expected set', '待核对账号清单'],
+        ['expected accounts', '待核对账号'],
+        ['expected', '待核对'],
+        ['ParseMethod', '检查方式'],
+        ['parse_method', '检查方式'],
+        ['manual_upload', '支持性材料上传情况'],
+        ['ManualUpload', '支持性材料上传情况'],
+        ['手工上传标识', '支持性材料标识'],
+        ['fallback', '补充核对'],
+        ['兜底', '补充核对'],
+        ['全量文本池', '截图全文'],
+        ['结构化', '按表格位置'],
+        ['结构', '表格位置'],
+        ['scope', '检查范围'],
+        ['Scope', '检查范围'],
+        ['PENDING', '待确认'],
+        ['REVIEW', '待确认'],
+        ['UNKNOWN', '待确认'],
+        ['BUILT', '已确认'],
+        ['PASS', '通过'],
+        ['FAIL', '未通过'],
+        ['SKIP', '跳过'],
+    ];
+    replacements.forEach(([raw, friendly]) => {
+        text = text.split(raw).join(friendly);
+    });
+    text = text.replace(/\bN\/A\b/g, '不适用');
+    text = text.replace(/\bTRUE\b/gi, '是');
+    text = text.replace(/\bFALSE\b/gi, '否');
+    return text.replace('无需截图文字识别', '无需核对截图');
+}
+
+function columnLabel(column) {
+    const labels = {
+        '总测试数': '需检查项',
+        '不适用': '不需测试',
+    };
+    return labels[column] || friendlyText(column);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    }[ch]));
+}
+
+// Drag & Drop for main file
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) handleFile(files[0], 'file');
+});
+
+function onFileSelected(e, type) {
+    if (e.target.files.length > 0) handleFile(e.target.files[0], type);
+}
+
+function handleFile(file, type) {
+    if (type === 'file') {
+        selectedFile = file;
+        document.getElementById('fileInfo').classList.remove('hidden');
+        document.getElementById('fileInfo').innerHTML =
+            `✅ 审阅文件: <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`;
+    } else {
+        selectedSupFile = file;
+        document.getElementById('supInfo').classList.remove('hidden');
+        document.getElementById('supInfo').innerHTML =
+            `✅ 支持性文件: <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`;
+    }
+    updateRunBtn();
+}
+
+function updateRunBtn() {
+    document.getElementById('runBtn').disabled = !selectedFile;
+}
+
+async function runPipeline() {
+    if (!selectedFile) return;
+
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 检查中...';
+
+    const statusArea = document.getElementById('statusArea');
+    statusArea.innerHTML = `
+        <div class="status-running">
+            <div class="status-current" id="currentProgress">⏳ 正在上传文件</div>
+            <div class="progress-log" id="progressLog"></div>
+        </div>`;
+    const currentProgress = document.getElementById('currentProgress');
+    const progressLog = document.getElementById('progressLog');
+
+    function updateProgress(message) {
+        const friendly = friendlyText(message);
+        currentProgress.textContent = `⏳ ${friendly}`;
+        const item = document.createElement('div');
+        item.textContent = `• ${friendly}`;
+        progressLog.appendChild(item);
+        while (progressLog.children.length > 10) {
+            progressLog.removeChild(progressLog.firstChild);
+        }
+        progressLog.scrollTop = progressLog.scrollHeight;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('sheet', document.getElementById('sheetName').value || 'Sheet1');
+    if (selectedSupFile) {
+        formData.append('supporting', selectedSupFile);
+    }
+
+    try {
+        const response = await fetch('/api/run', { method: 'POST', body: formData });
+        const contentType = response.headers.get('content-type') || '';
+
+        // 上传参数校验错误仍使用普通 JSON。
+        if (!contentType.includes('application/x-ndjson')) {
+            const data = await response.json();
+            throw new Error(data.error || `请求失败（${response.status}）`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+
+        while (true) {
+            const { value, done } = await reader.read();
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                const event = JSON.parse(line);
+                if (event.type === 'progress') {
+                    updateProgress(event.message);
+                } else if (event.type === 'result') {
+                    finalData = event.data;
+                } else if (event.type === 'error') {
+                    throw new Error(friendlyText(event.error || '检查失败'));
+                }
+            }
+            if (done) break;
+        }
+
+        if (!finalData) throw new Error('检查结束但未返回结果');
+        statusArea.innerHTML = '';
+        showResults(finalData);
+    } catch (err) {
+        statusArea.innerHTML = `<div class="status-error"></div>`;
+        statusArea.querySelector('.status-error').textContent = `❌ ${friendlyText(err.message)}`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ 开始检查';
+    }
+}
+
+function showResults(data) {
+    document.getElementById('resultCard').classList.remove('hidden');
+
+    const rows = data.rows || [];
+    let totalSystems = Number(data.system_count || rows.length);
+    let totalNeed = 0, totalPass = 0, totalFail = 0, totalPending = 0;
+    rows.forEach(row => {
+        Object.entries(row).forEach(([key, value]) => {
+            if (key === '系统' || key === '系统类别') return;
+            const text = String(value || '');
+            if (text.startsWith('是 -')) totalNeed += 1;
+            if (text.startsWith('是 - 通过')) totalPass += 1;
+            else if (text.startsWith('是 - 未通过') || text.startsWith('是 - 异常')) totalFail += 1;
+            else if (text.startsWith('是 -')) totalPending += 1;
+        });
+    });
+
+    document.getElementById('summaryGrid').innerHTML = `
+        <div class="summary-card"><div class="num">${totalSystems}</div><div class="label">系统数</div></div>
+        <div class="summary-card"><div class="num">${totalNeed}</div><div class="label">执行测试</div></div>
+        <div class="summary-card pass"><div class="num">${totalPass}</div><div class="label">已通过</div></div>
+        <div class="summary-card fail"><div class="num">${totalFail}</div><div class="label">未通过</div></div>
+        <div class="summary-card pending"><div class="num">${totalPending}</div><div class="label">待确认</div></div>
+    `;
+
+    const allCols = ['系统', '系统类别'];
+    rows.forEach(row => {
+        Object.keys(row).forEach(key => {
+            if (!allCols.includes(key)) allCols.push(key);
+        });
+    });
+    const thead = document.querySelector('#resultTable thead');
+    const tbody = document.querySelector('#resultTable tbody');
+
+    thead.innerHTML = '<tr>' + allCols.map(c => `<th>${escapeHtml(columnLabel(c))}</th>`).join('') + '</tr>';
+
+    tbody.innerHTML = rows.map(row => {
+        const cells = allCols.map(col => {
+            const v = String(row[col] || '');
+            let badge = '';
+            if (v.startsWith('是 - 通过')) badge = 'badge-pass';
+            else if (v.startsWith('是 - 未通过') || v.startsWith('是 - 异常')) badge = 'badge-fail';
+            else if (v.startsWith('是 -') || v.startsWith('待确认 -')) badge = 'badge-pending';
+            else if (v.startsWith('否 -') || v.startsWith('引用 -')) badge = 'badge-na';
+            const displayValue = friendlyText(v);
+            const safeValue = escapeHtml(displayValue);
+            return `<td>${badge ? `<span class="badge ${badge}">${safeValue}</span>` : safeValue}</td>`;
+        });
+        return `<tr>${cells.join('')}</tr>`;
+    }).join('');
+}
+
+function downloadConclusion() {
+    window.open('/api/download', '_blank');
+}
+
+function resetPage() {
+    selectedFile = null;
+    selectedSupFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('supInput').value = '';
+    document.getElementById('fileInfo').classList.add('hidden');
+    document.getElementById('supInfo').classList.add('hidden');
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('statusArea').innerHTML = '';
+    document.getElementById('resultCard').classList.add('hidden');
+}
+</script>
+</body>
+</html>
